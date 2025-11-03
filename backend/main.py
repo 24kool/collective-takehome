@@ -10,20 +10,49 @@ app = FastAPI(
 @app.get("/validate")
 def validate():
     # Stream and convert to list to see the data
-    bank_balances = list(stream_csv_as_dict("data/bank_balances.csv"))
     transactions = list(stream_csv_as_dict("data/transactions.csv"))
+    bank_balances = list(stream_csv_as_dict("data/bank_balances.csv"))
     
-    print("Bank Balances:")
-    for row in bank_balances:
-        print(row)
-    
-    print("\nTransactions:")
-    for row in transactions:
-        print(row)
-    
-    res = []
-    return {"results": res}
+    transaction_total_per_date = {}
+    transaction_total_per_date_cumulative = {}
+    cur_transaction_total = 0
 
+    for row in transactions:
+        transaction_date = row["date"]
+        transaction_amount = float(row["amount"])
+
+        if transaction_date not in transaction_total_per_date:
+            transaction_total_per_date[transaction_date] = 0
+        transaction_total_per_date[transaction_date] += transaction_amount
+        
+        cur_transaction_total += transaction_amount
+        transaction_total_per_date_cumulative[transaction_date] = cur_transaction_total
+
+    bank_balance_per_date = {}
+
+    for row in bank_balances:
+        bank_balance_date = row["date"]
+        bank_balance_amount = float(row["balance"])
+        bank_balance_per_date[bank_balance_date] = bank_balance_amount
+
+    res = []
+
+    all_dates = sorted(set(list(transaction_total_per_date.keys()) + list(bank_balance_per_date.keys())))
+
+    for date in all_dates:
+        transaction_total = transaction_total_per_date.get(date, 0)
+        transaction_cumulative = transaction_total_per_date_cumulative.get(date, 0)
+        bank_balance = bank_balance_per_date.get(date, 0)
+        match_bool = transaction_cumulative == bank_balance
+        res.append({
+            "date": date,
+            "transaction_total_per_date": transaction_total,
+            "transaction_total_per_date_cumulative": transaction_cumulative,
+            "bank_balance": bank_balance,
+            "match_bool": match_bool
+        })
+
+    return {"results": res}
 
 
 if __name__ == "__main__":
